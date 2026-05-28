@@ -9,6 +9,7 @@ function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isLoading, authError, signIn, signUp, signInWithOAuth } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitError, setSubmitError] = useState(null);
@@ -19,7 +20,11 @@ function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
 
-  const from = location.state?.from?.pathname || "/";
+  const from =
+  location.state?.from?.pathname &&
+  location.state.from.pathname !== "/"
+    ? location.state.from.pathname
+    : "/dashboard";
 
   useEffect(() => {
     if (user && !isLoading) {
@@ -27,14 +32,18 @@ function Login() {
     }
   }, [user, from, navigate, isLoading]);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (isSubmitting || isOAuthLoading) return;
-
+  const clearMessages = () => {
     setSubmitError(null);
     setSocialError(null);
     setSuccessMessage(null);
     setInfoMessage(null);
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (isSubmitting || isOAuthLoading) return;
+
+    clearMessages();
 
     if (!email.trim() || !password.trim()) {
       setSubmitError("Please enter both email and password.");
@@ -68,9 +77,7 @@ function Login() {
   const handleOAuthLogin = async (provider) => {
     if (isSubmitting || isOAuthLoading) return;
 
-    setSubmitError(null);
-    setSocialError(null);
-    setInfoMessage(null);
+    clearMessages();
     setIsOAuthLoading(true);
 
     try {
@@ -83,9 +90,7 @@ function Login() {
   };
 
   const handleForgotPassword = () => {
-    setSubmitError(null);
-    setSocialError(null);
-    setSuccessMessage(null);
+    clearMessages();
     setInfoMessage("Password reset coming soon.");
   };
 
@@ -100,9 +105,7 @@ function Login() {
     );
   }
 
-  if (user) {
-    return null;
-  }
+  if (user) return null;
 
   return (
     <div className="page-content auth-page">
@@ -120,19 +123,19 @@ function Login() {
 
           <div className="auth-card">
             <div className="auth-card-header">
-              <div>
-                <p className="eyebrow">{mode === "signin" ? "Sign in" : "Create account"}</p>
-                <h1>
-                  {mode === "signin"
-                    ? "Welcome to Scalioz Lead CRM Lite"
-                    : "Create your enterprise account"}
-                </h1>
-                <p className="page-description">
-                  {mode === "signin"
-                    ? "Sign in to your account and continue managing your pipeline with clarity."
-                    : "Create a secure account to start tracking every lead and customer interaction."}
-                </p>
-              </div>
+              <p className="eyebrow">{mode === "signin" ? "Sign in" : "Create account"}</p>
+
+              <h1>
+                {mode === "signin"
+                  ? "Welcome to Scalioz Lead CRM Lite"
+                  : "Create your Scalioz CRM account"}
+              </h1>
+
+              <p className="page-description">
+                {mode === "signin"
+                  ? "Sign in to continue managing leads, follow-ups and customer conversations."
+                  : "Create a secure account to start managing your sales pipeline."}
+              </p>
 
               <div className="auth-toggle-row">
                 <p>
@@ -142,18 +145,11 @@ function Login() {
                     className="link-button"
                     onClick={() => {
                       setMode(mode === "signin" ? "signup" : "signin");
-                      setSubmitError(null);
-                      setSocialError(null);
-                      setSuccessMessage(null);
-                      setInfoMessage(null);
+                      clearMessages();
                     }}
                   >
                     {mode === "signin" ? "Create account" : "Sign in"}
-                    {mode === "signin" ? (
-                      <UserPlus size={16} />
-                    ) : (
-                      <LogIn size={16} />
-                    )}
+                    {mode === "signin" ? <UserPlus size={16} /> : <LogIn size={16} />}
                   </button>
                 </p>
               </div>
@@ -225,7 +221,7 @@ function Login() {
                       ? "Signing in..."
                       : "Creating account..."
                     : mode === "signin"
-                    ? "Sign in"
+                    ? "Sign in securely"
                     : "Create account"}
                 </Button>
               </div>
@@ -246,6 +242,7 @@ function Login() {
                 <span style={{ fontWeight: 700 }}>G</span>
                 Continue with Google
               </Button>
+
               <Button
                 type="button"
                 variant="secondary"
@@ -274,6 +271,7 @@ function Login() {
               Built for teams that need secure lead management with a premium, modern workspace.
             </p>
           </div>
+
           <div className="visual-content">
             <div className="visual-card visual-card-large">
               <div className="visual-card-row">
@@ -286,6 +284,7 @@ function Login() {
                   <strong>1.7k</strong>
                 </div>
               </div>
+
               <div className="visual-chart">
                 <div className="chart-line"></div>
                 <div className="chart-dot dot-a"></div>

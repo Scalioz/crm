@@ -6,7 +6,6 @@ import LeadFilters from "../components/leads/LeadFilters";
 import LeadTable from "../components/leads/LeadTable";
 import LeadForm from "../components/leads/LeadForm";
 import LeadDetailDrawer from "../components/leads/LeadDetailDrawer";
-import EmptyState from "../components/ui/EmptyState";
 import { useToast } from "../components/ui/ToastProvider";
 import { exportLeadsToCsv } from "../utils/csvExport";
 
@@ -26,8 +25,18 @@ const emptyLead = {
   createdAt: "",
 };
 
-function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCompleteFollowUp, isLoadingLeads }) {
+function Leads({
+  leads,
+  onSaveLead,
+  onDeleteLead,
+  onUpdateLead,
+  onAddNote,
+  onCompleteFollowUp,
+  isLoadingLeads,
+}) {
   const location = useLocation();
+  const { addToast } = useToast();
+
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({
     source: "",
@@ -46,7 +55,6 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
   const [editorMode, setEditorMode] = useState("add");
   const [showForm, setShowForm] = useState(false);
   const [isSavingLead, setIsSavingLead] = useState(false);
-  const { addToast } = useToast();
 
   const filteredLeads = useMemo(() => {
     return leads
@@ -61,13 +69,18 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
         );
       })
       .filter((lead) => (filters.source ? lead.source === filters.source : true))
-      .filter((lead) => (filters.serviceInterest ? lead.serviceInterest === filters.serviceInterest : true))
+      .filter((lead) =>
+        filters.serviceInterest ? lead.serviceInterest === filters.serviceInterest : true
+      )
       .filter((lead) => (filters.status ? lead.status === filters.status : true))
-      .filter((lead) => (filters.temperature ? lead.temperature === filters.temperature : true));
+      .filter((lead) =>
+        filters.temperature ? lead.temperature === filters.temperature : true
+      );
   }, [leads, search, filters]);
 
   const sortedLeads = useMemo(() => {
     const sorted = [...filteredLeads];
+
     sorted.sort((a, b) => {
       const first = a[sortKey] ?? "";
       const second = b[sortKey] ?? "";
@@ -79,100 +92,15 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
         );
       }
 
-      return String(first).localeCompare(String(second), "en", { sensitivity: "base" }) *
-        (sortDirection === "asc" ? 1 : -1);
+      return (
+        String(first).localeCompare(String(second), "en", {
+          sensitivity: "base",
+        }) * (sortDirection === "asc" ? 1 : -1)
+      );
     });
 
     return sorted;
   }, [filteredLeads, sortKey, sortDirection]);
-
-  const totalPages = Math.max(1, Math.ceil(sortedLeads.length / rowsPerPage));
-  const paginatedLeads = sortedLeads.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
-
-  useEffect(() => {
-    setSelectedLeadIds((current) => current.filter((id) => filteredLeads.some((lead) => lead.id === id)));
-    setCurrentPage(1);
-  }, [filteredLeads]);
-
-  const handleSort = (key) => {
-    if (sortKey === key) {
-      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
-      return;
-    }
-    setSortKey(key);
-    setSortDirection("asc");
-  };
-
-  const handleToggleLeadSelection = (leadId) => {
-    setSelectedLeadIds((current) =>
-      current.includes(leadId) ? current.filter((id) => id !== leadId) : [...current, leadId]
-    );
-  };
-
-  const handleToggleSelectAll = () => {
-    const currentPageIds = paginatedLeads.map((lead) => lead.id);
-    const allSelected = currentPageIds.every((id) => selectedLeadIds.includes(id));
-    setSelectedLeadIds((current) =>
-      allSelected ? current.filter((id) => !currentPageIds.includes(id)) : [...new Set([...current, ...currentPageIds])]
-    );
-  };
-
-  const handleBulkApply = async () => {
-    if (!bulkAction || selectedLeadIds.length === 0) return;
-
-    try {
-      switch (bulkAction) {
-        case "delete":
-          await Promise.all(selectedLeadIds.map((leadId) => onDeleteLead(leadId)));
-          addToast(`${selectedLeadIds.length} lead${selectedLeadIds.length === 1 ? "" : "s"} deleted.`, "success");
-          setSelectedLeadIds([]);
-          break;
-        case "assign":
-          await Promise.all(
-            selectedLeadIds.map((leadId) =>
-              onUpdateLead(leadId, { assignedTo: "Sales team" }, "Assigned lead to sales team.")
-            )
-          );
-          addToast(`${selectedLeadIds.length} lead${selectedLeadIds.length === 1 ? "" : "s"} assigned.`, "info");
-          break;
-        case "status":
-          await Promise.all(
-            selectedLeadIds.map((leadId) =>
-              onUpdateLead(leadId, { status: "Follow-up" }, "Updated status to Follow-up.")
-            )
-          );
-          addToast(`${selectedLeadIds.length} lead${selectedLeadIds.length === 1 ? "" : "s"} updated to Follow-up.`, "info");
-          break;
-        case "export":
-          exportLeadsToCsv(sortedLeads.filter((lead) => selectedLeadIds.includes(lead.id)), "Scalioz_CRM_Export_Selected.csv");
-          addToast(`${selectedLeadIds.length} lead${selectedLeadIds.length === 1 ? "" : "s"} exported.`, "success");
-          break;
-        default:
-          break;
-      }
-    } catch (error) {
-      addToast(error?.message || "Bulk lead action failed.", "danger");
-    } finally {
-      setBulkAction("");
-    }
-  };
-
-  const selectedCount = selectedLeadIds.length;
-  const isLoading = isLoadingLeads;
-
-  const handleClearSelection = () => setSelectedLeadIds([]);
-
-  const handleRowsPerPageChange = (event) => {
-    setRowsPerPage(Number(event.target.value));
-    setCurrentPage(1);
-  };
-
-  const handlePageChange = (direction) => {
-    setCurrentPage((current) => {
-      const next = direction === "prev" ? current - 1 : current + 1;
-      return Math.min(Math.max(next, 1), totalPages);
-    });
-  };
 
   const leadStats = useMemo(
     () =>
@@ -187,6 +115,130 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
       ),
     [filteredLeads]
   );
+
+  const totalPages = Math.max(1, Math.ceil(sortedLeads.length / rowsPerPage));
+
+  const paginatedLeads = sortedLeads.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  const selectedCount = selectedLeadIds.length;
+  const isLoading = isLoadingLeads;
+
+  useEffect(() => {
+    setSelectedLeadIds((current) =>
+      current.filter((id) => filteredLeads.some((lead) => lead.id === id))
+    );
+    setCurrentPage(1);
+  }, [filteredLeads]);
+
+  useEffect(() => {
+    if (location.state?.openAdd) {
+      setEditorLead({ ...emptyLead, createdAt: new Date().toISOString() });
+      setEditorMode("add");
+      setShowForm(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortKey(key);
+    setSortDirection("asc");
+  };
+
+  const handleToggleLeadSelection = (leadId) => {
+    setSelectedLeadIds((current) =>
+      current.includes(leadId)
+        ? current.filter((id) => id !== leadId)
+        : [...current, leadId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const currentPageIds = paginatedLeads.map((lead) => lead.id);
+    const allSelected = currentPageIds.every((id) =>
+      selectedLeadIds.includes(id)
+    );
+
+    setSelectedLeadIds((current) =>
+      allSelected
+        ? current.filter((id) => !currentPageIds.includes(id))
+        : [...new Set([...current, ...currentPageIds])]
+    );
+  };
+
+  const handleBulkApply = async () => {
+    if (!bulkAction || selectedLeadIds.length === 0) return;
+
+    try {
+      switch (bulkAction) {
+        case "delete":
+          await Promise.all(selectedLeadIds.map((leadId) => onDeleteLead(leadId)));
+          addToast(`${selectedLeadIds.length} lead(s) deleted.`, "success");
+          setSelectedLeadIds([]);
+          break;
+
+        case "assign":
+          await Promise.all(
+            selectedLeadIds.map((leadId) =>
+              onUpdateLead(
+                leadId,
+                { assignedTo: "Sales team" },
+                "Assigned lead to sales team."
+              )
+            )
+          );
+          addToast(`${selectedLeadIds.length} lead(s) assigned.`, "info");
+          break;
+
+        case "status":
+          await Promise.all(
+            selectedLeadIds.map((leadId) =>
+              onUpdateLead(
+                leadId,
+                { status: "Follow-up" },
+                "Updated status to Follow-up."
+              )
+            )
+          );
+          addToast(`${selectedLeadIds.length} lead(s) updated.`, "info");
+          break;
+
+        case "export":
+          exportLeadsToCsv(
+            sortedLeads.filter((lead) => selectedLeadIds.includes(lead.id)),
+            "Scalioz_CRM_Export_Selected.csv"
+          );
+          addToast(`${selectedLeadIds.length} lead(s) exported.`, "success");
+          break;
+
+        default:
+          break;
+      }
+    } catch (error) {
+      addToast(error?.message || "Bulk lead action failed.", "danger");
+    } finally {
+      setBulkAction("");
+    }
+  };
+
+  const handleRowsPerPageChange = (event) => {
+    setRowsPerPage(Number(event.target.value));
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (direction) => {
+    setCurrentPage((current) => {
+      const next = direction === "prev" ? current - 1 : current + 1;
+      return Math.min(Math.max(next, 1), totalPages);
+    });
+  };
 
   const handleEdit = (lead) => {
     setEditorLead(lead);
@@ -206,20 +258,8 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
     setShowForm(true);
   };
 
-  useEffect(() => {
-    if (location.state?.openAdd) {
-      setEditorLead({ ...emptyLead, createdAt: new Date().toISOString() });
-      setEditorMode("add");
-      setShowForm(true);
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
-
   const handleDelete = async (leadId) => {
-    if (!window.confirm("Delete this lead? This action cannot be undone.")) {
-      return;
-    }
-
+    if (!window.confirm("Delete this lead? This action cannot be undone.")) return;
     await onDeleteLead(leadId);
   };
 
@@ -243,17 +283,18 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
     }
   };
 
-  const handleCompleteFollowUp = (leadId) => {
-    onCompleteFollowUp(leadId);
-  };
-
   const handleResetFilters = () => {
-    setFilters({ source: "", serviceInterest: "", status: "", temperature: "" });
+    setFilters({
+      source: "",
+      serviceInterest: "",
+      status: "",
+      temperature: "",
+    });
   };
 
   return (
-    <div className="page-content">
-      <div className="page-header">
+    <div className="page-content leads-page">
+      <div className="page-header leads-page-header">
         <div>
           <p className="eyebrow">Leads</p>
           <h1>{brand.appName}</h1>
@@ -261,160 +302,220 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
             Search, filter, and manage your pipeline with Scalioz branding.
           </p>
         </div>
+
         <div className="action-group">
-          <button type="button" className="button button-secondary" onClick={() => exportLeadsToCsv(filteredLeads, brand.exportFilename)}>
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={() => exportLeadsToCsv(filteredLeads, brand.exportFilename)}
+          >
             <Download size={16} /> Export CSV
           </button>
+
           <button type="button" className="button" onClick={handleAdd}>
             <Plus size={16} /> Add lead
           </button>
         </div>
       </div>
 
+      <section className="lead-stat-strip">
+        <div>
+          <span>Total visible</span>
+          <strong>{filteredLeads.length}</strong>
+        </div>
+        <div>
+          <span>Selected</span>
+          <strong>{selectedCount}</strong>
+        </div>
+        <div>
+          <span>Hot leads</span>
+          <strong>{leadStats.hot}</strong>
+        </div>
+        <div>
+          <span>Warm leads</span>
+          <strong>{leadStats.warm}</strong>
+        </div>
+      </section>
+
       <div className="leads-toolbar">
         <div>
           <p className="text-sm">{filteredLeads.length} leads found</p>
           <p className="lead-meta">
             {selectedCount > 0 ? `${selectedCount} selected • ` : ""}
-            Sorted by {sortKey === "followUpDate" ? "follow-up" : sortKey} · {sortDirection.toUpperCase()}
+            Sorted by {sortKey === "followUpDate" ? "follow-up" : sortKey} ·{" "}
+            {sortDirection.toUpperCase()}
           </p>
         </div>
+
         <div className="bulk-toolbar">
-          <select value={bulkAction} onChange={(event) => setBulkAction(event.target.value)}>
+          <select
+            value={bulkAction}
+            onChange={(event) => setBulkAction(event.target.value)}
+          >
             <option value="">Bulk action</option>
             <option value="delete">Delete selected</option>
             <option value="assign">Assign selected</option>
             <option value="status">Mark follow-up</option>
             <option value="export">Export selected</option>
           </select>
-          <button type="button" className="button button-secondary" onClick={handleBulkApply} disabled={!bulkAction || selectedCount === 0}>
+
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={handleBulkApply}
+            disabled={!bulkAction || selectedCount === 0}
+          >
             Apply
           </button>
-          <button type="button" className="button button-secondary" onClick={() => setCompactMode((current) => !current)}>
+
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={() => setCompactMode((current) => !current)}
+          >
             {compactMode ? "Standard mode" : "Compact mode"}
           </button>
-          <button type="button" className="button button-secondary" onClick={handleClearSelection} disabled={selectedCount === 0}>
+
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={() => setSelectedLeadIds([])}
+            disabled={selectedCount === 0}
+          >
             Clear selection
           </button>
         </div>
       </div>
 
-      <div className="subpanel">
-        <div className="subpanel-left">
-          <div className="search-wrapper">
-            <input
-              className="search-input"
-              placeholder="Search leads by name, company, email or phone"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <LeadFilters filters={filters} onFilterChange={setFilters} onReset={handleResetFilters} />
-          {isLoading ? (
-            <div className="table-card">
-              <div className="empty-state">
-                <h3>Loading leads…</h3>
-                <p>Fetching your lead list from Supabase.</p>
-              </div>
-            </div>
-          ) : (
-            <LeadTable
-              leads={paginatedLeads}
-              onView={handleView}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              selected={selectedLeadIds}
-              onToggleSelect={handleToggleLeadSelection}
-              onToggleSelectAll={handleToggleSelectAll}
-              allSelected={paginatedLeads.length > 0 && paginatedLeads.every((lead) => selectedLeadIds.includes(lead.id))}
-              sortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={handleSort}
-              compactMode={compactMode}
-              rowsPerPage={rowsPerPage}
-              noResults={!isLoading && filteredLeads.length === 0}
-              onEmptyAction={handleAdd}
-            />
-          )}
+      <div className="leads-main-panel">
+        <div className="search-wrapper">
+          <input
+            className="search-input"
+            placeholder="Search leads by name, company, email or phone"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
 
-          <div className="pagination-panel">
-            <div className="pagination-info">
-              <span>Rows per page</span>
-              <select value={rowsPerPage} onChange={handleRowsPerPageChange}>
-                {[5, 8, 12, 16].map((amount) => (
-                  <option key={amount} value={amount}>
-                    {amount}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="pagination-actions">
-              <button type="button" className="button button-secondary" onClick={() => handlePageChange("prev")} disabled={currentPage === 1}>
-                Prev
-              </button>
-              <span>
-                Page {currentPage} of {totalPages}
-              </span>
-              <button type="button" className="button button-secondary" onClick={() => handlePageChange("next")} disabled={currentPage === totalPages}>
-                Next
-              </button>
+        <LeadFilters
+          filters={filters}
+          onFilterChange={setFilters}
+          onReset={handleResetFilters}
+        />
+
+        {isLoading ? (
+          <div className="table-card">
+            <div className="empty-state">
+              <h3>Loading leads…</h3>
+              <p>Fetching your lead list from Supabase.</p>
             </div>
           </div>
+        ) : (
+          <LeadTable
+            leads={paginatedLeads}
+            onView={handleView}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            selected={selectedLeadIds}
+            onToggleSelect={handleToggleLeadSelection}
+            onToggleSelectAll={handleToggleSelectAll}
+            allSelected={
+              paginatedLeads.length > 0 &&
+              paginatedLeads.every((lead) => selectedLeadIds.includes(lead.id))
+            }
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            compactMode={compactMode}
+            rowsPerPage={rowsPerPage}
+            noResults={!isLoading && filteredLeads.length === 0}
+            onEmptyAction={handleAdd}
+          />
+        )}
 
-          <div className="export-center-card">
-            <h3>Export center</h3>
-            <p>Download current lead selection, visible results, or the full Scalioz export package.</p>
-            <div className="export-actions">
-              <button type="button" className="button" onClick={() => exportLeadsToCsv(filteredLeads, "Scalioz_CRM_Export_Visible.csv")}>Export visible</button>
-              <button type="button" className="button button-secondary" onClick={() => exportLeadsToCsv(leads, "Scalioz_CRM_Export_All.csv")}>Export all</button>
-            </div>
+        <div className="pagination-panel">
+          <div className="pagination-info">
+            <span>Rows per page</span>
+            <select value={rowsPerPage} onChange={handleRowsPerPageChange}>
+              {[5, 8, 12, 16].map((amount) => (
+                <option key={amount} value={amount}>
+                  {amount}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="pagination-actions">
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => handlePageChange("prev")}
+              disabled={currentPage === 1}
+            >
+              Prev
+            </button>
+
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => handlePageChange("next")}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
           </div>
         </div>
 
-        <aside className="side-pane">
-          <div className="pane-header">
-            <h2>Pipeline snapshot</h2>
-            <p>{filteredLeads.length} leads visible</p>
+        <div className="export-center-card">
+          <h3>Export center</h3>
+          <p>
+            Download current lead selection, visible results, or the full Scalioz
+            export package.
+          </p>
+
+          <div className="export-actions">
+            <button
+              type="button"
+              className="button"
+              onClick={() =>
+                exportLeadsToCsv(
+                  filteredLeads,
+                  "Scalioz_CRM_Export_Visible.csv"
+                )
+              }
+            >
+              Export visible
+            </button>
+
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() =>
+                exportLeadsToCsv(leads, "Scalioz_CRM_Export_All.csv")
+              }
+            >
+              Export all
+            </button>
           </div>
-          <div className="panel-summary">
-            <div className="summary-item">
-              <span>Filtered count</span>
-              <strong>{filteredLeads.length}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Selected</span>
-              <strong>{selectedCount}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Hot leads</span>
-              <strong>{leadStats.hot}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Warm leads</span>
-              <strong>{leadStats.warm}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Cold leads</span>
-              <strong>{leadStats.cold}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Current source</span>
-              <strong>{filters.source || "All sources"}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Current status</span>
-              <strong>{filters.status || "All statuses"}</strong>
-            </div>
-          </div>
-        </aside>
+        </div>
       </div>
 
       {showForm && (
         <div className="modal-overlay" onClick={handleCancel}>
-          <div className="modal-drawer" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="modal-drawer"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="modal-header">
               <div>
-                <p className="eyebrow">{editorMode === "view" ? "Lead detail" : "Lead form"}</p>
+                <p className="eyebrow">
+                  {editorMode === "view" ? "Lead detail" : "Lead form"}
+                </p>
+
                 <h2>
                   {editorMode === "view"
                     ? "View lead"
@@ -423,10 +524,17 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
                     : "New lead"}
                 </h2>
               </div>
-              <button type="button" className="icon-button close-button" onClick={handleCancel} title="Close form">
+
+              <button
+                type="button"
+                className="icon-button close-button"
+                onClick={handleCancel}
+                title="Close form"
+              >
                 <X size={18} />
               </button>
             </div>
+
             <div className="modal-body">
               {editorMode === "view" ? (
                 <LeadDetailDrawer
@@ -434,7 +542,7 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
                   onClose={handleCancel}
                   onUpdateLead={onUpdateLead}
                   onAddNote={onAddNote}
-                  onCompleteFollowUp={handleCompleteFollowUp}
+                  onCompleteFollowUp={onCompleteFollowUp}
                 />
               ) : (
                 <LeadForm
@@ -448,12 +556,24 @@ function Leads({ leads, onSaveLead, onDeleteLead, onUpdateLead, onAddNote, onCom
                 />
               )}
             </div>
+
             {editorMode !== "view" && (
               <div className="modal-footer">
-                <button type="button" className="button button-secondary" onClick={handleCancel} disabled={isSavingLead}>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={handleCancel}
+                  disabled={isSavingLead}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="button" form="lead-form" disabled={isSavingLead}>
+
+                <button
+                  type="submit"
+                  className="button"
+                  form="lead-form"
+                  disabled={isSavingLead}
+                >
                   {isSavingLead ? "Saving..." : "Save lead"}
                 </button>
               </div>
