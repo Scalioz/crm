@@ -11,16 +11,24 @@ function buildTaskPayload(task) {
   };
 }
 
-export async function getTasks() {
-  const { data, error } = await supabase.from("tasks").select("*").order("created_at", { ascending: false });
+export async function getTasks(clinicId) {
+  let query = supabase.from("tasks").select("*").order("created_at", { ascending: false });
+  if (clinicId) {
+    query = query.eq("clinic_id", clinicId);
+  }
+  const { data, error } = await query;
   if (error) {
     throw error;
   }
   return data;
 }
 
-export async function createTask(task) {
-  const payload = buildTaskPayload(task);
+// clinicId must be passed in from the logged-in user's profile
+// (see AuthContext's clinicId). Without it, the database will
+// reject the insert, since Row Level Security requires every new
+// task to be tagged with the creator's own clinic.
+export async function createTask(task, clinicId) {
+  const payload = { ...buildTaskPayload(task), clinic_id: clinicId };
   const { data, error } = await supabase.from("tasks").insert([payload]).select().single();
   if (error) {
     throw error;
