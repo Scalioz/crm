@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createTask as apiCreateTask, deleteTask as apiDeleteTask, getTasks as apiGetTasks, subscribeTasks as apiSubscribeTasks, updateTask as apiUpdateTask } from "../services/taskService";
 
-export function useTasks({ onError } = {}) {
+export function useTasks({ onError, clinicId } = {}) {
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -23,7 +23,7 @@ export function useTasks({ onError } = {}) {
     setError(null);
 
     try {
-      const data = await apiGetTasks();
+      const data = await apiGetTasks(clinicId);
       setTasks(data ?? []);
       return data ?? [];
     } catch (loadError) {
@@ -33,7 +33,7 @@ export function useTasks({ onError } = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [handleError]);
+  }, [handleError, clinicId]);
 
   const createTask = useCallback(
     async (task) => {
@@ -48,7 +48,7 @@ export function useTasks({ onError } = {}) {
       setTasks((current) => [optimisticTask, ...current]);
 
       try {
-        const created = await apiCreateTask(task);
+        const created = await apiCreateTask(task, clinicId);
         setTasks((current) => current.map((item) => (item.id === optimisticId ? created : item)));
         return created;
       } catch (createError) {
@@ -59,7 +59,7 @@ export function useTasks({ onError } = {}) {
         setIsSaving(false);
       }
     },
-    [handleError]
+    [handleError, clinicId]
   );
 
   const updateTask = useCallback(
