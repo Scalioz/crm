@@ -6,6 +6,7 @@ import { getFollowUpStatus } from "../utils/leadHelpers";
 import { useToast } from "../components/ui/ToastProvider";
 import { useTasks } from "../hooks/useTasks";
 import { useFormState } from "../hooks/useFormState";
+import { useAuth } from "../contexts/AuthContext";
 
 function formatFollowUpDate(dateString) {
   if (!dateString) return "—";
@@ -57,6 +58,7 @@ function Tasks({ leads, onCompleteFollowUp }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { addToast } = useToast();
+  const { clinicId } = useAuth();
 
   const {
     tasks,
@@ -69,7 +71,7 @@ function Tasks({ leads, onCompleteFollowUp }) {
     updateTask,
     deleteTask,
     completeTask,
-  } = useTasks({ onError: addToast });
+  } = useTasks({ onError: addToast, clinicId });
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [modalMode, setModalMode] = useState("add");
